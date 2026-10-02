@@ -1078,17 +1078,30 @@ td.st-ok { color: var(--done); font-weight: 600; } td.st-pend { color: var(--red
   let iniciado = false;
   async function start() {
     const cfg = window.FIREBASE_CONFIG;
-    let db;
-    if (cfg && cfg.apiKey && window.firebase) {
-      try { firebase.initializeApp(cfg); db = firebase.firestore(); }
-      catch (e) { console.error(e); toast('Não foi possível conectar ao Firebase. Confira a configuração no início do arquivo.'); }
+    const temConfig = !!(cfg && cfg.apiKey);
+    let db, motivo = '';
+    if (temConfig) {
+      if (!window.firebase) motivo = 'Os arquivos do Firebase não carregaram (sem internet, ou algum bloqueador/antivírus barrou o endereço www.gstatic.com).';
+      else {
+        try { firebase.initializeApp(cfg); db = firebase.firestore(); }
+        catch (e) { console.error(e); motivo = 'O Firebase recusou a configuração: ' + (e && e.message ? e.message : e); }
+      }
+      if (!db) {
+        // Com o Firebase configurado, nunca cai no modo local: mostra o problema.
+        document.getElementById('wrap').replaceChildren(h('div', { class: 'login' },
+          h('h2', null, 'Não foi possível conectar'),
+          h('p', null, motivo),
+          h('p', { class: 'hint' }, 'Confira a internet e recarregue a página. Se continuar, mande um print desta tela.'),
+          h('button', { class: 'btn primary', type: 'button', onclick: () => location.reload() }, 'Tentar de novo')));
+        return;
+      }
     }
     S.local = !db;
     S.db = db || localStore();
     if (S.local) {
       document.getElementById('modo').replaceChildren(h('div', { class: 'alert', style: 'background:var(--marker-soft);border-color:var(--marker)' },
         h('p', null, h('strong', { style: 'color:var(--marker)' }, 'Modo local. '),
-          'Os dados ficam só neste navegador. Para a equipe toda usar o mesmo quadro, configure o Firebase no início do arquivo index.html.')));
+          'Este arquivo está sem a configuração do Firebase (FIREBASE_CONFIG = null), então os dados ficam só neste navegador.')));
     }
     S.db.collection('perfis').onSnapshot(s => {
       S.perfis = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
