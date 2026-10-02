@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quadro de Tarefas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: navy "wall" strip with tabs; below it a white board split by ruled columns (like the office whiteboard). Semanas tab = week list + report. Detail drawer on the right. */
+:root {
+  --wall: #1f2c47;
+  --wall-ink: #e9eef8;
+  --bg: #e8ecf2;
+  --board: #ffffff;
+  --ink: #1a2230;
+  --muted: #5f6a7b;
+  --rule: #cfd6e0;
+  --marker: #2348a6;
+  --marker-soft: #e6ecfa;
+  --red: #c4292b;
+  --red-soft: #fbe8e7;
+  --done: #3f7d4d;
+  --done-soft: #e5f2e8;
+  --shadow: 0 1px 2px rgba(26, 34, 48, .08);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Hanken Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --colw: 250px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --wall: #141c2e; --wall-ink: #dfe6f3; --bg: #0f141c; --board: #171d27; --ink: #e3e8f0; --muted: #96a1b2;
+    --rule: #2b3442; --marker: #8fa9ff; --marker-soft: #22304f; --red: #ff8a84; --red-soft: #3b2023;
+    --done: #86c895; --done-soft: #1d3324; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --wall: #141c2e; --wall-ink: #dfe6f3; --bg: #0f141c; --board: #171d27; --ink: #e3e8f0; --muted: #96a1b2;
+  --rule: #2b3442; --marker: #8fa9ff; --marker-soft: #22304f; --red: #ff8a84; --red-soft: #3b2023;
+  --done: #86c895; --done-soft: #1d3324; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+@media (max-width: 640px) { :root { --colw: 236px; } }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; display: flex; flex-direction: column; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--marker); outline-offset: 2px; }
+
+/* top */
+.top { background: var(--wall); color: var(--wall-ink); padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px; }
+.top-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
+.top h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 1.45rem; letter-spacing: -.01em; }
+.top .stats { font-family: var(--f-mono); font-size: .75rem; opacity: .8; display: flex; gap: 14px; flex-wrap: wrap; }
+.top .me { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: .85rem; opacity: .9; }
+.top .me img { width: 26px; height: 26px; border-radius: 50%; }
+.ro { font-size: .74rem; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.3); }
+.tabs { display: flex; gap: 4px; }
+.tab { border: 0; background: transparent; color: var(--wall-ink); opacity: .7; padding: 8px 14px; border-radius: 8px 8px 0 0; font-weight: 600; }
+.tab[aria-selected="true"] { background: var(--bg); color: var(--ink); opacity: 1; }
+.tab .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-left: 6px; vertical-align: middle; }
+
+/* alert */
+.alert { margin: 12px 16px 0; background: var(--red-soft); border: 1px solid var(--red); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.alert strong { color: var(--red); }
+.alert p { margin: 0; flex: 1; min-width: 200px; }
+
+/* board */
+.wrap { flex: 1; min-height: 0; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .85rem; color: var(--muted); }
+.toolbar label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.board-scroll { flex: 1; min-height: 0; overflow: auto; background: var(--board); border: 1px solid var(--rule); border-radius: 10px; }
+.board { display: flex; min-height: 100%; width: max-content; min-width: 100%; }
+.col { width: var(--colw); flex: none; border-right: 2px solid var(--rule); display: flex; flex-direction: column; }
+.col.drop { background: var(--marker-soft); }
+.col.prontos { border-right: 0; border-left: 3px double var(--rule); background: var(--done-soft); }
+.col.prontos .colhead { background: var(--done-soft); }
+.col.prontos .colhead h2 { color: var(--done); }
+.lock { font-size: .7rem; color: var(--done); font-weight: 600; }
+.addcol-wrap { padding: 14px; width: 200px; flex: none; border-right: 2px solid var(--rule); }
+.colhead { position: sticky; top: 0; z-index: 2; background: var(--board); padding: 14px 10px 10px 14px; display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--rule); }
+.colhead h2 { margin: 0; flex: 1; min-width: 0; font-family: var(--f-display); font-weight: 600; font-size: .95rem; letter-spacing: .06em; text-transform: uppercase; overflow-wrap: break-word; }
+.count { font-family: var(--f-mono); font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.colhead { position: sticky; }
+.tools { display: flex; opacity: 0; transition: opacity .15s; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: var(--board); border-radius: 8px; box-shadow: var(--shadow); }
+.colhead:hover .tools, .colhead:focus-within .tools { opacity: 1; }
+@media (hover: none) { .tools { opacity: 1; position: static; transform: none; box-shadow: none; } }
+.items { padding: 10px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+
+.icon { border: 0; background: transparent; width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--muted); flex: none; }
+.icon:hover { background: var(--bg); color: var(--ink); }
+.icon svg { width: 15px; height: 15px; }
+
+.item { background: var(--board); border: 1px solid var(--rule); border-radius: 8px; box-shadow: var(--shadow); padding: 9px 10px; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; cursor: pointer; }
+.item:hover { border-color: var(--marker); }
+.item[draggable="true"] { cursor: grab; }
+.item.is-done { background: var(--done-soft); border-color: transparent; }
+.check { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--rule); background: var(--board); display: grid; place-items: center; padding: 0; color: var(--red); margin-top: 1px; }
+.check:hover { border-color: var(--red); }
+.check svg { width: 20px; height: 20px; }
+.is-done .check { border-color: transparent; background: transparent; }
+.item .body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.item .t { color: var(--marker); font-weight: 700; overflow-wrap: anywhere; }
+.item .d { color: var(--ink); font-size: .9rem; overflow-wrap: anywhere; }
+.item .a { color: var(--red); font-weight: 600; font-size: .88rem; overflow-wrap: anywhere; }
+.resp { display: inline-flex; align-items: center; gap: 5px; width: max-content; max-width: 100%; margin-top: 3px; padding: 2px 9px 2px 7px; border-radius: 999px; background: var(--marker-soft); color: var(--marker); font-size: .8rem; font-weight: 600; overflow-wrap: anywhere; }
+.resp svg { width: 13px; height: 13px; flex: none; }
+.resp-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px; }
+.resp-row { display: flex; gap: 8px; flex-wrap: wrap; } .resp-row > * { flex: 1; min-width: 140px; }
+.item .m { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; font-family: var(--f-mono); font-size: .68rem; color: var(--muted); }
+.item .m .ok { color: var(--done); }
+.hidden-note { border: 0; background: transparent; color: var(--muted); font-size: .8rem; text-align: left; padding: 4px 2px; text-decoration: underline; text-underline-offset: 3px; }
+
+.add { border: 1px dashed var(--rule); background: transparent; border-radius: 8px; padding: 7px 10px; color: var(--muted); text-align: left; font-size: .86rem; display: flex; align-items: center; gap: 6px; width: 100%; }
+.add:hover { border-color: var(--marker); color: var(--marker); background: var(--marker-soft); }
+.add svg { width: 14px; height: 14px; }
+
+.form { display: flex; flex-direction: column; gap: 6px; background: var(--board); border: 1px solid var(--marker); border-radius: 8px; padding: 8px; }
+.field, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid var(--rule); background: var(--board); border-radius: 7px; padding: 7px 9px; }
+textarea { min-height: 70px; resize: vertical; }
+.field:focus, textarea:focus, select:focus { outline: 2px solid var(--marker); outline-offset: -1px; border-color: transparent; }
+.field.acao { color: var(--red); }
+.actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hint { font-size: .72rem; color: var(--muted); margin-right: auto; }
+.btn { border: 1px solid var(--rule); background: var(--board); border-radius: 7px; padding: 5px 11px; font-size: .85rem; font-weight: 600; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--marker); border-color: var(--marker); color: var(--board); }
+.btn.primary:disabled { opacity: .5; cursor: default; }
+.btn.danger { background: var(--red); border-color: var(--red); color: var(--board); }
+.btn.done { background: var(--done); border-color: var(--done); color: var(--board); }
+.confirm { background: var(--red-soft); border-radius: 7px; padding: 8px 10px; font-size: .85rem; display: flex; flex-direction: column; gap: 6px; }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgba(10, 15, 25, .35); z-index: 10; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100%); background: var(--board); z-index: 11; box-shadow: -8px 0 30px rgba(0,0,0,.18); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.drawer header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+.drawer header h3 { margin: 0; flex: 1; font-family: var(--f-display); font-size: 1.1rem; }
+.drawer .scroll { overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+.sec { display: flex; flex-direction: column; gap: 8px; }
+.sec > h4 { margin: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.lbl { font-size: .8rem; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; background: var(--bg); }
+.status.ok { background: var(--done-soft); }
+.status span { flex: 1; min-width: 160px; font-size: .9rem; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
+.timeline li { position: relative; font-size: .88rem; }
+.timeline li::before { content: ""; position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--board); border: 2px solid var(--marker); }
+.timeline li.k-cumprido::before { border-color: var(--done); background: var(--done); }
+.timeline li.k-reaberto::before { border-color: var(--red); }
+.timeline time, .when { display: block; font-family: var(--f-mono); font-size: .7rem; color: var(--muted); }
+.comment { border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.comment .txt { white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment .who { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; }
+.comment .who img { width: 18px; height: 18px; border-radius: 50%; }
+
+/* weeks */
+.weeks { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px 1fr; gap: 14px; }
+@media (max-width: 760px) { .weeks { grid-template-columns: 1fr; } }
+.wlist { overflow: auto; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+@media (max-width: 760px) { .wlist { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; } .wbtn { flex: none; width: 200px; } }
+.wbtn { border: 1px solid var(--rule); background: var(--board); border-radius: 9px; padding: 9px 12px; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.wbtn[aria-current="true"] { border-color: var(--marker); box-shadow: inset 3px 0 0 var(--marker); }
+.wbtn b { font-family: var(--f-display); font-size: .98rem; }
+.wbtn .r { font-family: var(--f-mono); font-size: .72rem; color: var(--muted); }
+.pill { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; width: max-content; }
+.pill.sent { background: var(--done-soft); color: var(--done); }
+.pill.open { background: var(--marker-soft); color: var(--marker); }
+.pill.late { background: var(--red-soft); color: var(--red); }
+.report { overflow: auto; background: var(--board); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.report-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-start; }
+.report-head h2 { margin: 0; font-family: var(--f-display); font-size: 1.5rem; text-wrap: balance; }
+.report-head .sub { color: var(--muted); font-size: .9rem; }
+.report-head .actions { margin-left: auto; }
+.nums { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.num { display: flex; flex-direction: column; }
+.num b { font-family: var(--f-display); font-size: 1.7rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.num span { font-size: .78rem; color: var(--muted); }
+.num.ok b { color: var(--done); } .num.pend b { color: var(--red); }
+.rsec h3 { margin: 0 0 8px; font-size: .78rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.rsec .empty-line { color: var(--muted); font-size: .9rem; margin: 0; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+td .t { color: var(--marker); font-weight: 700; }
+td .d { color: var(--muted); font-size: .84rem; }
+td .mono { font-family: var(--f-mono); font-size: .75rem; white-space: nowrap; }
+td.st-ok { color: var(--done); font-weight: 600; } td.st-pend { color: var(--red); font-weight: 600; }
+.closed-note { font-size: .85rem; color: var(--done); }
+.esboco-box { display: flex; flex-direction: column; gap: 8px; }
+.esboco { min-height: 200px; line-height: 1.55; white-space: pre-wrap; background: var(--bg); }
+.rlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rlist li { padding: 9px 0; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.rlist li:hover .rn { text-decoration: underline; text-underline-offset: 3px; }
+.rlist .line { font-size: 1rem; overflow-wrap: anywhere; }
+.rlist .rn { color: var(--marker); font-weight: 700; }
+.rlist .ok { color: var(--done); font-weight: 600; }
+.rlist .pend { color: var(--red); font-weight: 600; }
+.rlist .sub { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.rsec h3.ok { color: var(--done); } .rsec h3.pend { color: var(--red); }
+
+.login { margin: 40px auto; width: 100%; max-width: 380px; box-sizing: border-box; background: var(--board); border: 1px solid var(--rule); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.login h2 { margin: 0; font-family: var(--f-display); font-size: 1.35rem; }
+.login p { margin: 0; }
+.login .btn { padding: 8px 14px; font-size: .95rem; }
+.login select { padding: 8px 9px; }
+.erro { color: var(--red); background: var(--red-soft); border-radius: 7px; padding: 8px 10px; font-size: .88rem; }
+.novo-perfil { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.novo-perfil .lbl { flex: 1; min-width: 160px; }
+.senha { min-width: 70px; display: inline-block; }
+.notice { margin: auto; max-width: 440px; text-align: center; color: var(--muted); padding: 32px 16px; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 8px; font-size: .86rem; max-width: calc(100% - 32px); z-index: 20; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<!--
+  CONFIGURAÇÃO DO FIREBASE (para a equipe toda compartilhar o mesmo quadro)
+  1. Acesse https://console.firebase.google.com e crie um projeto.
+  2. Em "Firestore Database", clique em "Criar banco de dados".
+  3. Em Configurações do projeto > Seus apps, adicione um app da Web (ícone </>)
+     e copie o objeto firebaseConfig para dentro de FIREBASE_CONFIG abaixo.
+  Enquanto FIREBASE_CONFIG for null, o quadro funciona em modo local (só neste navegador).
+-->
+<script>
+  window.FIREBASE_CONFIG = null;
+  /* Exemplo:
+  window.FIREBASE_CONFIG = {
+    apiKey: "...",
+    authDomain: "seu-projeto.firebaseapp.com",
+    projectId: "seu-projeto",
+    storageBucket: "seu-projeto.appspot.com",
+    messagingSenderId: "...",
+    appId: "..."
+  };
+  */
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <h1>Quadro de Tarefas</h1>
+    <div class="stats" id="stats"></div>
+    <div class="me" id="me"></div>
+  </div>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+</header>
+<div id="modo"></div>
+<div id="alert"></div>
+<main class="wrap" id="wrap"><div class="notice">Carregando o quadro…</div></main>
+<div id="drawer"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const DAY = 86400000;
+  const S = {
+    db: null, user: null, meId: null, readOnly: false, local: true, rascunho: {}, perfis: {}, perfisLoaded: false, novo: { nome: '', senha: '' }, verSenha: {}, editPerfil: null,
+    cols: [], itens: [], semanas: {}, loaded: { cols: false, itens: false, semanas: false },
+    tab: 'quadro', week: null, openItem: null,
+    adding: null, addingCol: null, renaming: null, confirm: null,
+    showOld: false, drag: null, comment: '', edit: null, now: Date.now(),
+  };
+
+  const ICONS = {
+    plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+    edit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>',
+    trash: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/></svg>',
+    left: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5L5.5 8 10 12.5"/></svg>',
+    right: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg>',
+    close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+    user: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="5.5" r="2.7"/><path d="M2.8 14c.6-2.7 2.6-4.2 5.2-4.2s4.6 1.5 5.2 4.2"/></svg>',
+    tick: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5l4 4.5L17 3.5"/></svg>',
+  };
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'html') el.innerHTML = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else if (k === 'value') el.value = v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat(Infinity)) {
+      if (kid == null || kid === false) continue;
+      el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    }
+    return el;
+  }
+  const fillEl = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter(k => k != null && k !== false));
+  const icon = (name, label, onclick) => h('button', { class: 'icon', type: 'button', title: label, 'aria-label': label, html: ICONS[name], onclick: e => { e.stopPropagation(); onclick(e); } });
+
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4200);
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && S.openItem) { S.openItem = null; S.edit = null; S.confirm = null; render(); }
+  });
+  async function write(fn) {
+    try { await fn(); return true; }
+    catch (e) {
+      console.error(e);
+      if (e && e.code === 'permission-denied') toast('O banco de dados recusou a gravação. Confira as regras do Firestore.');
+      else if (e && e.code === 'resource-exhausted') toast('O limite gratuito do Firebase foi atingido hoje. Tente amanhã.');
+      else toast('Não foi possível salvar. Verifique a conexão e tente de novo.');
+      return false;
+    }
+  }
+
+  // ---------- datas e semanas ----------
+  const pad = n => String(n).padStart(2, '0');
+  const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const dm = ts => { const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1); };
+  const dia = ts => DIAS[new Date(ts).getDay()] + ' ' + dm(ts);
+  const hora = ts => { const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const quando = ts => dia(ts) + ' ' + hora(ts);
+  const dataCompleta = ts => { const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); };
+  function dur(ms) {
+    ms = Math.max(0, ms);
+    const m = Math.round(ms / 60000);
+    if (m < 60) return m <= 1 ? '1 minuto' : m + ' minutos';
+    if (ms < DAY) { const hr = Math.floor(ms / 3600000); return hr === 1 ? '01 hora' : pad(hr) + ' horas'; }
+    const d = Math.floor(ms / DAY); return d === 1 ? '1 dia' : d + ' dias';
+  }
+  const PRONTOS = 'prontos';
+  function weekStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+  function addDays(ts, n) { const d = new Date(ts); d.setDate(d.getDate() + n); return d.getTime(); }
+  const weekKey = s => { const d = new Date(s); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  const weekLabel = s => `do dia ${dm(s)} ao dia ${dm(addDays(s, 4))}`;
+  const semana = s => 'Semana ' + weekLabel(s);
+  function firstWeek() {
+    const t = S.itens.reduce((m, i) => Math.min(m, i.criadoEm || Infinity), Infinity);
+    return weekStart(isFinite(t) ? Math.min(t, S.now) : S.now);
+  }
+  const weekNum = s => Math.round((s - firstWeek()) / (7 * DAY)) + 1;
+  function allWeeks() {
+    const out = []; const first = firstWeek();
+    for (let s = weekStart(S.now); s >= first; s = addDays(s, -7)) out.push(s);
+    return out;
+  }
+  function report(s) {
+    const e = addDays(s, 7);
+    const isCur = s === weekStart(S.now);
+    // momento de referência: agora, ou o fim da semana (sábado 00:00) para semanas passadas
+    const ref = isCur ? S.now : Math.min(S.now, addDays(s, 5));
+    const adicionadas = S.itens.filter(i => i.criadoEm >= s && i.criadoEm < e);
+    const prontos = S.itens.filter(i => i.cumprido && i.cumpridoEm >= s && i.cumpridoEm < e).sort((a, b) => a.cumpridoEm - b.cumpridoEm);
+    const pendentes = S.itens.filter(i => i.criadoEm < e && !(i.cumprido && i.cumpridoEm < e)).sort((a, b) => a.criadoEm - b.criadoEm);
+    return { s, e, ref, isCur, adicionadas, prontos, pendentes };
+  }
+  // Friday 16:30 or later, through the weekend
+  function dueNow() {
+    const d = new Date(S.now), wd = d.getDay();
+    return wd === 6 || wd === 0 || (wd === 5 && (d.getHours() * 60 + d.getMinutes()) >= 16 * 60 + 30);
+  }
+  function pendingAlerts() {
+    const out = [];
+    const cur = weekStart(S.now), prev = addDays(cur, -7);
+    if (dueNow() && !S.semanas[weekKey(cur)]) out.push({ s: cur, atual: true });
+    if (prev >= firstWeek() && !S.semanas[weekKey(prev)] && S.itens.some(i => i.criadoEm < cur)) out.push({ s: prev, atual: false });
+    return out;
+  }
+
+  // ---------- ações ----------
+  const colName = id => id === PRONTOS ? 'Prontos' : ((S.cols.find(c => c.id === id) || {}).nome || 'coluna excluída');
+  const ev = (tipo, extra) => ({ tipo, em: Date.now(), por: S.meId, ...extra });
+  const nextOrder = () => (S.cols.length ? Math.max(...S.cols.map(c => c.ordem || 0)) : 0) + 1;
+
+  // Criar, renomear, excluir e reordenar colunas: só o master.
+  async function addColumn(nome) {
+    if (!isMaster()) return;
+    nome = (nome || '').trim(); if (!nome) return;
+    S.addingCol = null; render();
+    await write(() => S.db.collection('colunas').add({ nome, ordem: nextOrder() }));
+  }
+  async function moveCol(col, dir) {
+    if (!isMaster()) return;
+    const j = S.cols.indexOf(col) + dir; const other = S.cols[j]; if (!other) return;
+    const a = col.ordem, b = other.ordem === a ? a + dir : other.ordem;
+    if (await write(() => S.db.doc('colunas/' + col.id).update({ ordem: b })))
+      await write(() => S.db.doc('colunas/' + other.id).update({ ordem: a }));
+  }
+  async function deleteCol(col) {
+    if (!isMaster()) return;
+    S.confirm = null;
+    await write(() => S.db.doc('colunas/' + col.id).delete());
+  }
+  async function saveRenameCol() {
+    if (!isMaster()) { S.renaming = null; return render(); }
+    const r = S.renaming; if (!r) return; S.renaming = null; render();
+    const nome = r.texto.trim(); if (nome) await write(() => S.db.doc('colunas/' + r.id).update({ nome }));
+  }
+  async function addItem() {
+    const a = S.adding; if (!a || !a.titulo.trim()) return;
+    const now = Date.now();
+    const data = { titulo: a.titulo.trim(), detalhe: a.detalhe.trim(), acao: a.acao.trim(), coluna: a.coluna,
+      criadoEm: now, criadoPor: S.meId, posicaoEm: now, cumprido: false, cumpridoEm: null, cumpridoPor: null,
+      historico: [ev('criado', { para: a.coluna, paraNome: colName(a.coluna) })], comentarios: [] };
+    S.adding = { coluna: a.coluna, titulo: '', detalhe: '', acao: '' }; render();
+    await write(() => S.db.collection('itens').add(data));
+  }
+  const itemRef = id => S.db.doc('itens/' + id);
+  const getItem = id => S.itens.find(i => i.id === id);
+  // Pronto é definitivo: o item vai para a coluna Prontos e ninguém mais mexe nele.
+  async function markPronto(item) {
+    if (!item || item.cumprido) return;
+    S.confirm = null;
+    await write(() => itemRef(item.id).update({
+      cumprido: true, cumpridoEm: Date.now(), cumpridoPor: S.meId,
+      historico: [...(item.historico || []), ev('pronto', { de: item.coluna, deNome: colName(item.coluna) })],
+    }));
+  }
+  async function moveItem(item, colId) {
+    if (!item || item.cumprido || item.coluna === colId) return;
+    if (colId === PRONTOS) { S.confirm = { kind: 'pronto', id: item.id }; S.openItem = item.id; render(); return; }
+    await write(() => itemRef(item.id).update({
+      coluna: colId, posicaoEm: Date.now(),
+      historico: [...(item.historico || []), ev('movido', { de: item.coluna, deNome: colName(item.coluna), para: colId, paraNome: colName(colId) })],
+    }));
+  }
+  async function saveEdit(item) {
+    const e = S.edit; if (!e || !e.titulo.trim() || item.cumprido) return;
+    S.edit = null; render();
+    await write(() => itemRef(item.id).update({ titulo: e.titulo.trim(), detalhe: e.detalhe.trim(), acao: e.acao.trim(),
+      historico: [...(item.historico || []), ev('editado')] }));
+  }
+  const nomeDe = id => (S.perfis[id] && S.perfis[id].nome) || id || 'Alguém';
+  // Para definir o responsável é preciso a senha da pessoa escolhida.
+  async function definirResponsavel(item) {
+    const r = S.resp; const p = S.perfis[r.perfil];
+    if (!p || p.ativo === false) { r.erro = 'Escolha quem vai ser o responsável.'; return render(); }
+    if (p.senha !== r.senha) { r.erro = `Senha de ${p.nome} incorreta.`; r.senha = ''; return render(); }
+    if (item.cumprido) return;
+    const id = r.perfil;
+    S.resp = { perfil: '', senha: '', erro: '' }; render();
+    if (await write(() => itemRef(item.id).update({ responsavel: id, responsavelEm: Date.now(),
+      historico: [...(item.historico || []), ev('responsavel', { para: id })] }))) toast(`${p.nome} agora é responsável por ${item.titulo}.`);
+  }
+  async function removerResponsavel(item) {
+    if (item.cumprido || !isMaster()) return;
+    S.confirm = null;
+    await write(() => itemRef(item.id).update({ responsavel: null, responsavelEm: null,
+      historico: [...(item.historico || []), ev('responsavel', { para: null })] }));
+  }
+  async function addComment(item) {
+    const texto = S.comment.trim(); if (!texto || item.cumprido) return;
+    S.comment = ''; render();
+    const c = { id: Math.random().toString(36).slice(2, 10), texto, autor: S.meId, em: Date.now() };
+    if (!(await write(() => itemRef(item.id).update({ comentarios: [...(item.comentarios || []), c] })))) { S.comment = texto; render(); }
+  }
+  async function deleteComment(item, cid) {
+    S.confirm = null;
+    await write(() => itemRef(item.id).update({ comentarios: (item.comentarios || []).filter(c => c.id !== cid) }));
+  }
+  // Excluir um item exige a senha de um perfil master.
+  async function deleteItem(item) {
+    if (item.cumprido) return;
+    const senha = (S.confirm && S.confirm.senha) || '';
+    const ok = Object.values(S.perfis).some(p => p.master && p.ativo !== false && p.senha === senha);
+    if (!ok) { S.confirm = { kind: 'item', id: item.id, senha: '', erro: 'Senha do master incorreta.' }; return render(); }
+    S.confirm = null; S.openItem = null;
+    await write(() => itemRef(item.id).delete());
+  }
+  async function closeWeek(s) {
+    const r = report(s);
+    await write(() => S.db.doc('semanas/' + weekKey(s)).set({
+      inicio: s, fechadoEm: Date.now(), fechadoPor: S.meId,
+      adicionadas: r.adicionadas.length, prontos: r.prontos.length, pendentes: r.pendentes.length,
+    }));
+    toast('Relatório da semana marcado como enviado.');
+  }
+  const respTxt = i => i.responsavel ? ` (responsável: ${nomeDe(i.responsavel)})` : '';
+  const linhaPronto = i => `${i.titulo} - tarefa durou ${dur(i.cumpridoEm - i.criadoEm)}${respTxt(i)}`;
+  const linhaPendente = (i, ref) => `${i.titulo} - tarefa pendente há ${dur(ref - i.criadoEm)} (adicionada dia ${dataCompleta(i.criadoEm)})${respTxt(i)}`;
+  function reportText(s) {
+    const r = report(s), lines = [];
+    lines.push(`Relatório da semana ${weekLabel(s)}`, '');
+    lines.push('Prontos');
+    if (!r.prontos.length) lines.push('Nenhuma tarefa ficou pronta nesta semana.');
+    r.prontos.forEach(i => lines.push(linhaPronto(i)));
+    lines.push('', 'Pendentes');
+    if (!r.pendentes.length) lines.push('Nenhuma tarefa pendente.');
+    r.pendentes.forEach(i => lines.push(linhaPendente(i, r.ref)));
+    return lines.join('\n');
+  }
+  // Esboço da mensagem: gerado do quadro, mas pode ser editado antes de copiar.
+  const esboco = s => S.rascunho[weekKey(s)] ?? reportText(s);
+  async function copyReport(s) {
+    const txt = esboco(s);
+    try { await navigator.clipboard.writeText(txt); toast('Mensagem copiada. Cole no WhatsApp ou no e-mail.'); }
+    catch {
+      const ta = h('textarea', { value: txt, style: 'position:fixed;opacity:0' }); document.body.append(ta); ta.select();
+      try { document.execCommand('copy'); toast('Mensagem copiada.'); } catch { toast('Não foi possível copiar. Selecione o texto do esboço e copie.'); }
+      ta.remove();
+    }
+  }
+
+  // ---------- render ----------
+  let seq = 0;
+  async function render() {
+    const my = ++seq; let ps = {};
+    if (S.user) {
+      const ids = new Set([S.meId]);
+      S.itens.forEach(i => { ids.add(i.criadoPor); ids.add(i.cumpridoPor); (i.historico || []).forEach(e => ids.add(e.por)); (i.comentarios || []).forEach(c => ids.add(c.autor)); });
+      Object.values(S.semanas).forEach(w => ids.add(w.fechadoPor));
+      const list = [...ids].filter(Boolean);
+      try { ps = list.length ? await S.user.profiles(list) : {}; } catch { ps = {}; }
+    }
+    if (my !== seq) return;
+    paint(ps);
+  }
+
+  function paint(ps) {
+    if (!S.meId) return;
+    const act = document.activeElement;
+    const focusKey = act && act.dataset ? act.dataset.key : null;
+    const sel = focusKey && act.setSelectionRange ? [act.selectionStart, act.selectionEnd] : null;
+    const scrolls = [...document.querySelectorAll('[data-scroll]')].map(el => [el.dataset.scroll, el.scrollLeft, el.scrollTop]);
+
+    const prof = id => (id && ps[id]) || null;
+    const who = id => (S.perfis[id] && S.perfis[id].nome) || id || 'Alguém';
+    const avatar = (id, size) => prof(id) ? h('img', { src: prof(id).avatarUrl, alt: '', width: size, height: size }) : null;
+
+    // top
+    const visible = S.itens;
+    document.getElementById('stats').replaceChildren(
+      h('span', null, `${visible.filter(i => !i.cumprido).length} pendentes`),
+      h('span', null, `${visible.filter(i => i.cumprido && i.cumpridoEm >= weekStart(S.now)).length} prontos nesta semana`));
+    fillEl(document.getElementById('me'), 
+      S.local ? h('span', { class: 'ro' }, 'Modo local') : null,
+      S.meId ? h('span', null, who(S.meId)) : null,
+      isMaster() ? h('span', { class: 'ro' }, 'Master') : null,
+      S.meId ? h('button', { class: 'tab', type: 'button', style: 'padding:4px 8px;font-weight:500', onclick: () => S.sair() }, 'Sair') : null);
+    const alerts = (S.loaded.itens && S.loaded.semanas) ? pendingAlerts() : [];
+    fillEl(document.getElementById('tabs'), 
+      h('button', { class: 'tab', role: 'tab', type: 'button', 'aria-selected': String(S.tab === 'quadro'), onclick: () => { S.tab = 'quadro'; render(); } }, 'Quadro'),
+      h('button', { class: 'tab', role: 'tab', type: 'button', 'aria-selected': String(S.tab === 'semanas'), onclick: () => { S.tab = 'semanas'; render(); } }, 'Semanas', alerts.length ? h('span', { class: 'dot', 'aria-label': 'relatório pendente' }) : null),
+      isMaster() ? h('button', { class: 'tab', role: 'tab', type: 'button', 'aria-selected': String(S.tab === 'perfis'), onclick: () => { S.tab = 'perfis'; render(); } }, 'Perfis') : null);
+    document.title = alerts.length ? '(!) Relatório da semana — Quadro de Tarefas' : 'Quadro de Tarefas';
+
+    // alert banner
+    const al = document.getElementById('alert');
+    al.replaceChildren(...alerts.map(a => h('div', { class: 'alert', role: 'alert' },
+      h('p', null, h('strong', null, a.atual ? 'Sexta, 16:30: hora do relatório. ' : 'Relatório atrasado. '),
+        a.atual ? `Confira o que foi feito na semana ${weekLabel(a.s)} e envie o relatório.`
+                : `O relatório da semana ${weekLabel(a.s)} ainda não foi enviado.`),
+      h('button', { class: 'btn danger', type: 'button', onclick: () => { S.tab = 'semanas'; S.week = a.s; render(); } }, 'Abrir relatório'))));
+
+    const wrap = document.getElementById('wrap');
+    if (!S.meId) return;
+    if (!S.loaded.cols || !S.loaded.itens || !S.loaded.semanas) return;
+    if (S.tab === 'perfis' && !isMaster()) S.tab = 'quadro';
+    wrap.replaceChildren(S.tab === 'quadro' ? boardView() : S.tab === 'perfis' ? perfisView() : weeksView());
+    drawerView();
+
+    for (const [k, l, t] of scrolls) { const el = document.querySelector(`[data-scroll="${k}"]`); if (el) { el.scrollLeft = l; el.scrollTop = t; } }
+    if (focusKey) {
+      const el = document.querySelector(`[data-key="${CSS.escape(focusKey)}"]`);
+      if (el) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch {} }
+    } else {
+      const auto = document.querySelector('[data-autofocus]');
+      if (auto) { auto.focus({ preventScroll: false }); if (auto.setSelectionRange && auto.value != null) try { auto.setSelectionRange(auto.value.length, auto.value.length); } catch {} }
+    }
+
+    // ----- quadro -----
+    function boardView() {
+      const cur = weekStart(S.now);
+      const prontosAll = S.itens.filter(i => i.cumprido);
+      const oldCount = prontosAll.filter(i => i.cumpridoEm < cur).length;
+      const frag = h('div', { style: 'display:contents' });
+      frag.append(h('div', { class: 'toolbar' },
+        h('span', null, 'Clique num item para ver histórico e comentários. Arraste para mudar de coluna. Marque ✓ quando ficar pronto.'),
+        oldCount ? h('label', null, h('input', { type: 'checkbox', id: 'showold', checked: S.showOld, onchange: e => { S.showOld = e.target.checked; render(); } }),
+          `Mostrar ${oldCount} prontos de semanas anteriores`) : null));
+      const board = h('div', { class: 'board' });
+
+      const dropZone = (el, colId) => {
+        el.addEventListener('dragover', e => { if (S.drag) { e.preventDefault(); el.classList.add('drop'); } });
+        el.addEventListener('dragleave', () => el.classList.remove('drop'));
+        el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drop'); const it = getItem(S.drag); S.drag = null; moveItem(it, colId); });
+      };
+
+      S.cols.forEach((col, idx) => {
+        const list = S.itens.filter(i => i.coluna === col.id && !i.cumprido).sort((a, b) => (a.posicaoEm || a.criadoEm) - (b.posicaoEm || b.criadoEm));
+        const colEl = h('section', { class: 'col', 'aria-label': col.nome });
+        dropZone(colEl, col.id);
+        let head;
+        if (S.renaming && S.renaming.id === col.id) {
+          head = h('div', { class: 'colhead' }, h('input', { class: 'field', 'data-key': 'rename', 'data-autofocus': true, value: S.renaming.texto, 'aria-label': 'Nome da coluna',
+            oninput: e => { S.renaming.texto = e.target.value; },
+            onkeydown: e => { if (e.key === 'Enter') saveRenameCol(); if (e.key === 'Escape') { S.renaming = null; render(); } },
+            onblur: () => { if (S.renaming) saveRenameCol(); } }));
+        } else if (S.confirm && S.confirm.kind === 'col' && S.confirm.id === col.id) {
+          const n = list.length;
+          head = h('div', { class: 'colhead' }, h('div', { class: 'confirm', style: 'flex:1' },
+            n ? h('span', null, `Mova os ${n} itens pendentes de "${col.nome}" antes de excluir a coluna.`) : h('span', null, `Excluir a coluna "${col.nome}"?`),
+            h('div', { class: 'actions' },
+              n ? null : h('button', { class: 'btn danger', type: 'button', 'data-autofocus': true, onclick: () => deleteCol(col) }, 'Excluir'),
+              h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = null; render(); } }, n ? 'Entendi' : 'Cancelar'))));
+        } else {
+          head = h('div', { class: 'colhead' }, h('h2', null, col.nome), h('span', { class: 'count', title: 'Pendentes' }, list.length || ''),
+            S.readOnly || !isMaster() ? null : h('span', { class: 'tools' },
+              idx > 0 ? icon('left', 'Mover coluna para a esquerda', () => moveCol(col, -1)) : null,
+              idx < S.cols.length - 1 ? icon('right', 'Mover coluna para a direita', () => moveCol(col, 1)) : null,
+              icon('edit', 'Renomear coluna', () => { S.renaming = { id: col.id, texto: col.nome }; render(); }),
+              icon('trash', 'Excluir coluna', () => { S.confirm = { kind: 'col', id: col.id }; render(); })));
+        }
+        const items = h('div', { class: 'items' }, list.map(itemCard));
+        if (!S.readOnly) {
+          if (S.adding && S.adding.coluna === col.id) items.append(addForm());
+          else items.append(h('button', { class: 'add', type: 'button', html: ICONS.plus + '<span>Adicionar</span>', onclick: () => { S.adding = { coluna: col.id, titulo: '', detalhe: '', acao: '' }; render(); } }));
+        }
+        colEl.append(head, items);
+        board.append(colEl);
+      });
+
+      if (!S.readOnly && isMaster()) {
+        board.append(h('div', { class: 'addcol-wrap' }, S.addingCol != null
+          ? h('input', { class: 'field', 'data-key': 'addcol', 'data-autofocus': true, value: S.addingCol, placeholder: 'Nome da coluna', 'aria-label': 'Nome da nova coluna',
+              oninput: e => { S.addingCol = e.target.value; },
+              onkeydown: e => { if (e.key === 'Enter') addColumn(S.addingCol); if (e.key === 'Escape') { S.addingCol = null; render(); } },
+              onblur: () => { if (S.addingCol != null && !S.addingCol.trim()) { S.addingCol = null; render(); } } })
+          : h('button', { class: 'add', type: 'button', html: ICONS.plus + '<span>Nova coluna</span>', onclick: () => { S.addingCol = ''; render(); } })));
+      }
+
+      // Prontos: sempre a última coluna, travada
+      const prontos = prontosAll.filter(i => S.showOld || i.cumpridoEm >= cur).sort((a, b) => b.cumpridoEm - a.cumpridoEm);
+      const pc = h('section', { class: 'col prontos', 'aria-label': 'Prontos' },
+        h('div', { class: 'colhead' }, h('h2', null, 'Prontos'), h('span', { class: 'lock' }, 'travado')),
+        h('div', { class: 'items' }, prontos.length ? prontos.map(itemCard)
+          : h('p', { class: 'hint', style: 'margin:4px 2px' }, 'Marque ✓ num item, ou arraste-o para cá, quando ele ficar pronto.')));
+      if (!S.readOnly) dropZone(pc, PRONTOS);
+      board.append(pc);
+
+      frag.append(h('div', { class: 'board-scroll', 'data-scroll': 'board' }, board));
+      return frag;
+    }
+
+    function itemCard(i) {
+      const comments = (i.comentarios || []).length;
+      const open = () => { S.openItem = i.id; S.edit = null; S.comment = ''; S.confirm = null; S.resp = { perfil: '', senha: '', erro: '' }; render(); };
+      return h('article', { class: 'item' + (i.cumprido ? ' is-done' : ''), tabindex: '0', draggable: S.readOnly || i.cumprido ? null : 'true',
+          'aria-label': i.titulo + (i.cumprido ? ', pronto' : ''),
+          ondragstart: e => { S.drag = i.id; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', i.id); } catch {} },
+          ondragend: () => { S.drag = null; },
+          onclick: open,
+          onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) open(); } },
+        i.cumprido
+          ? h('span', { class: 'check', 'aria-hidden': 'true', html: ICONS.tick })
+          : h('button', { class: 'check', type: 'button', disabled: S.readOnly, title: 'Marcar como pronto', 'aria-label': 'Marcar como pronto',
+              onclick: e => { e.stopPropagation(); S.openItem = i.id; S.confirm = { kind: 'pronto', id: i.id }; render(); } }),
+        h('div', { class: 'body' },
+          h('span', { class: 't' }, i.titulo),
+          i.detalhe ? h('span', { class: 'd' }, i.detalhe) : null,
+          i.acao ? h('span', { class: 'a' }, i.acao) : null,
+          i.responsavel ? h('span', { class: 'resp', title: 'Responsável', html: ICONS.user }, h('span', null, who(i.responsavel))) : null),
+        h('div', { class: 'm' },
+          i.cumprido ? h('span', { title: 'Veio de ' + colName(i.coluna) }, colName(i.coluna)) : null,
+          h('span', { title: 'Adicionado em ' + quando(i.criadoEm) }, '+ ' + dia(i.criadoEm)),
+          i.cumprido ? h('span', { class: 'ok', title: 'Pronto em ' + quando(i.cumpridoEm) }, '✓ ' + dia(i.cumpridoEm) + ' · durou ' + dur(i.cumpridoEm - i.criadoEm)) : null,
+          comments ? h('span', null, comments + (comments > 1 ? ' comentários' : ' comentário')) : null));
+    }
+
+    function addForm() {
+      const a = S.adding;
+      const save = h('button', { class: 'btn primary', type: 'button', disabled: !a.titulo.trim(), onclick: addItem }, 'Adicionar');
+      const keys = e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } if (e.key === 'Escape') { S.adding = null; render(); } };
+      return h('div', { class: 'form' },
+        h('input', { class: 'field', 'data-key': 'add-t', 'data-autofocus': true, value: a.titulo, placeholder: 'Nome (ex.: Rafaela)', 'aria-label': 'Nome',
+          oninput: e => { a.titulo = e.target.value; save.disabled = !a.titulo.trim(); }, onkeydown: keys }),
+        h('input', { class: 'field', 'data-key': 'add-d', value: a.detalhe, placeholder: 'Detalhe (ex.: PJe Alimentos conclusão)', 'aria-label': 'Detalhe',
+          oninput: e => { a.detalhe = e.target.value; }, onkeydown: keys }),
+        h('input', { class: 'field acao', 'data-key': 'add-a', value: a.acao, placeholder: 'Ação em vermelho (ex.: Subir) — opcional', 'aria-label': 'Ação',
+          oninput: e => { a.acao = e.target.value; }, onkeydown: keys }),
+        h('div', { class: 'actions' }, h('span', { class: 'hint' }, 'Enter adiciona'),
+          h('button', { class: 'btn', type: 'button', onclick: () => { S.adding = null; render(); } }, 'Fechar'), save));
+    }
+
+    // ----- drawer -----
+    function drawerView() {
+      const host = document.getElementById('drawer');
+      const i = S.openItem && getItem(S.openItem);
+      if (!i) { S.openItem = null; host.replaceChildren(); return; }
+      const close = () => { S.openItem = null; S.edit = null; S.confirm = null; render(); };
+      const locked = i.cumprido || S.readOnly;
+      const ws = weekStart(i.criadoEm);
+      const editing = S.edit && S.edit.id === i.id && !i.cumprido;
+      const sec = (title, ...kids) => h('section', { class: 'sec' }, h('h4', null, title), kids);
+
+      const info = editing
+        ? sec('Editar',
+            h('label', { class: 'lbl' }, 'Nome', h('input', { class: 'field', 'data-key': 'e-t', 'data-autofocus': true, value: S.edit.titulo, oninput: e => { S.edit.titulo = e.target.value; } })),
+            h('label', { class: 'lbl' }, 'Detalhe', h('input', { class: 'field', 'data-key': 'e-d', value: S.edit.detalhe, oninput: e => { S.edit.detalhe = e.target.value; } })),
+            h('label', { class: 'lbl' }, 'Ação em vermelho', h('input', { class: 'field acao', 'data-key': 'e-a', value: S.edit.acao, oninput: e => { S.edit.acao = e.target.value; } })),
+            h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: () => { S.edit = null; render(); } }, 'Cancelar'),
+              h('button', { class: 'btn primary', type: 'button', onclick: () => saveEdit(i) }, 'Salvar')))
+        : h('section', { class: 'sec' },
+            h('div', { style: 'display:flex;gap:8px;align-items:flex-start' },
+              h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px' },
+                h('span', { style: 'color:var(--marker);font-weight:700;font-size:1.15rem;overflow-wrap:anywhere' }, i.titulo),
+                i.detalhe ? h('span', null, i.detalhe) : null,
+                i.acao ? h('span', { style: 'color:var(--red);font-weight:600' }, i.acao) : null),
+              locked ? null : icon('edit', 'Editar item', () => { S.edit = { id: i.id, titulo: i.titulo, detalhe: i.detalhe || '', acao: i.acao || '' }; render(); })),
+            h('span', { class: 'when' }, `Adicionado ${dataCompleta(i.criadoEm)} ${hora(i.criadoEm)} por ${who(i.criadoPor)} · semana ${weekLabel(ws)}`));
+
+      let status;
+      if (i.cumprido) {
+        status = h('div', { class: 'status ok' }, h('span', null,
+          h('b', null, 'Pronto'), ` em ${dataCompleta(i.cumpridoEm)} ${hora(i.cumpridoEm)} por ${who(i.cumpridoPor)}. A tarefa durou ${dur(i.cumpridoEm - i.criadoEm)}. Itens prontos ficam travados.`));
+      } else if (S.confirm && S.confirm.kind === 'pronto' && S.confirm.id === i.id) {
+        status = h('div', { class: 'confirm' },
+          h('span', null, `Marcar "${i.titulo}" como pronto? Ele vai para Prontos e não poderá mais ser alterado.`),
+          h('div', { class: 'actions' },
+            h('button', { class: 'btn done', type: 'button', 'data-autofocus': true, onclick: () => markPronto(i) }, 'Sim, está pronto'),
+            h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = null; render(); } }, 'Cancelar')));
+      } else {
+        status = h('div', { class: 'status' },
+          h('span', null, `Pendente há ${dur(S.now - i.criadoEm)} (adicionado dia ${dataCompleta(i.criadoEm)})`),
+          S.readOnly ? null : h('button', { class: 'btn done', type: 'button', onclick: () => { S.confirm = { kind: 'pronto', id: i.id }; render(); } }, 'Marcar como pronto'));
+      }
+
+      if (!S.resp) S.resp = { perfil: '', senha: '', erro: '' };
+      const atual = i.responsavel;
+      const opcoes = perfisAtivos().filter(p => p.id !== atual);
+      const respSec = sec('Responsável',
+        h('div', { class: 'resp-box' },
+          atual ? h('div', { class: 'actions' }, h('span', { class: 'resp', html: ICONS.user }, h('span', null, who(atual))),
+              h('span', { class: 'hint', style: 'margin-right:auto' }, i.responsavelEm ? 'desde ' + quando(i.responsavelEm) : ''),
+              !i.cumprido && isMaster() ? (S.confirm && S.confirm.kind === 'semresp' && S.confirm.id === i.id
+                ? [h('button', { class: 'btn danger', type: 'button', onclick: () => removerResponsavel(i) }, 'Remover'),
+                   h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = null; render(); } }, 'Cancelar')]
+                : h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = { kind: 'semresp', id: i.id }; render(); } }, 'Remover')) : null)
+            : h('span', { class: 'hint' }, i.cumprido ? 'Ficou sem responsável.' : 'Ninguém é responsável por esta tarefa ainda.'),
+          i.cumprido || S.readOnly ? null : [
+            h('div', { class: 'resp-row' },
+              h('select', { id: 'resp-perfil', 'aria-label': atual ? 'Novo responsável' : 'Responsável', onchange: e => { S.resp.perfil = e.target.value; S.resp.erro = ''; render(); } },
+                h('option', { value: '', selected: !S.resp.perfil }, atual ? 'Trocar responsável…' : 'Escolha o responsável…'),
+                opcoes.map(p => h('option', { value: p.id, selected: p.id === S.resp.perfil }, p.nome))),
+              S.resp.perfil ? h('input', { class: 'field', type: 'password', 'data-key': 'resp-senha', 'data-autofocus': true, autocomplete: 'off', value: S.resp.senha,
+                placeholder: 'Senha de ' + who(S.resp.perfil), 'aria-label': 'Senha de ' + who(S.resp.perfil),
+                oninput: e => { S.resp.senha = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') definirResponsavel(i); } }) : null),
+            S.resp.perfil ? h('div', { class: 'actions' }, h('span', { class: 'hint' }, 'A pessoa escolhida digita a própria senha para confirmar.'),
+              h('button', { class: 'btn primary', type: 'button', onclick: () => definirResponsavel(i) }, 'Confirmar responsável')) : null,
+            S.resp.erro ? h('p', { class: 'erro', role: 'alert', style: 'margin:0' }, S.resp.erro) : null,
+          ]));
+
+      const mover = i.cumprido ? sec('Coluna de origem', h('span', null, colName(i.coluna)))
+        : sec('Coluna',
+            h('select', { id: 'mover', 'aria-label': 'Coluna', disabled: S.readOnly, onchange: e => moveItem(i, e.target.value) },
+              S.cols.map(c => h('option', { value: c.id, selected: c.id === i.coluna }, c.nome))));
+
+      const comments = (i.comentarios || []).slice().sort((a, b) => a.em - b.em);
+      const commentSec = sec(`Comentários${comments.length ? ' (' + comments.length + ')' : ''}`,
+        !comments.length && i.cumprido ? h('span', { class: 'hint' }, 'Nenhum comentário.') : null,
+        comments.map(c => h('div', { class: 'comment' },
+          h('div', { class: 'who' }, avatar(c.autor, 18), h('span', { style: 'flex:1' }, who(c.autor)), h('time', { class: 'when' }, quando(c.em)),
+            c.autor && c.autor === S.meId && !locked ? icon('trash', 'Excluir comentário', () => { S.confirm = { kind: 'com', id: c.id }; render(); }) : null),
+          h('div', { class: 'txt' }, c.texto),
+          S.confirm && S.confirm.kind === 'com' && S.confirm.id === c.id ? h('div', { class: 'confirm' }, h('span', null, 'Excluir este comentário?'),
+            h('div', { class: 'actions' }, h('button', { class: 'btn danger', type: 'button', onclick: () => deleteComment(i, c.id) }, 'Excluir'),
+              h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = null; render(); } }, 'Cancelar'))) : null)),
+        locked ? null : (() => {
+          const btn = h('button', { class: 'btn primary', type: 'button', disabled: !S.comment.trim(), onclick: () => addComment(i) }, 'Comentar');
+          return h('div', { class: 'sec' },
+            h('textarea', { 'data-key': 'comment', value: S.comment, placeholder: 'Escreva um comentário…', 'aria-label': 'Novo comentário',
+              oninput: e => { S.comment = e.target.value; btn.disabled = !S.comment.trim(); },
+              onkeydown: e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addComment(i); } } }),
+            h('div', { class: 'actions' }, h('span', { class: 'hint' }, 'Ctrl+Enter envia'), btn));
+        })());
+
+      const label = e => ({
+        criado: `Adicionado em ${e.paraNome || colName(e.para)}`,
+        movido: `Movido de ${e.deNome || colName(e.de)} para ${e.paraNome || colName(e.para)}`,
+        pronto: `Marcado como pronto (saiu de ${e.deNome || colName(e.de)})`,
+        editado: 'Texto editado',
+        responsavel: e.para ? `Responsável: ${who(e.para)}` : 'Responsável removido',
+      }[e.tipo] || e.tipo);
+      const hist = sec('Histórico', h('ol', { class: 'timeline' },
+        (i.historico || []).slice().sort((a, b) => a.em - b.em).map(e => h('li', { class: 'k-' + (e.tipo === 'pronto' ? 'cumprido' : e.tipo) },
+          h('span', null, label(e), ' · ', who(e.por)), h('time', null, dataCompleta(e.em) + ' ' + hora(e.em) + ' · semana ' + weekLabel(weekStart(e.em)))))));
+
+      const del = locked ? null : (S.confirm && S.confirm.kind === 'item' && S.confirm.id === i.id)
+        ? h('div', { class: 'confirm' }, h('span', null, 'Excluir este item? Use só para itens lançados por engano: ele some também dos relatórios. Para excluir, digite a senha do master.'),
+            h('input', { class: 'field', type: 'password', 'data-key': 'del-senha', 'data-autofocus': true, autocomplete: 'off', value: S.confirm.senha || '',
+              placeholder: 'Senha do master', 'aria-label': 'Senha do master',
+              oninput: e => { S.confirm.senha = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') deleteItem(i); } }),
+            S.confirm.erro ? h('span', { style: 'color:var(--red);font-weight:600' }, S.confirm.erro) : null,
+            h('div', { class: 'actions' }, h('button', { class: 'btn danger', type: 'button', onclick: () => deleteItem(i) }, 'Excluir item'),
+              h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = null; render(); } }, 'Cancelar')))
+        : h('button', { class: 'btn', type: 'button', style: 'align-self:flex-start;color:var(--red)', onclick: () => { S.confirm = { kind: 'item', id: i.id }; render(); } }, 'Excluir item');
+
+      host.replaceChildren(
+        h('div', { class: 'scrim', onclick: close }),
+        h('aside', { class: 'drawer', role: 'dialog', 'aria-label': 'Detalhes do item', onkeydown: e => { if (e.key === 'Escape') close(); } },
+          h('header', null, h('h3', null, i.cumprido ? 'Prontos' : colName(i.coluna)), icon('close', 'Fechar', close)),
+          h('div', { class: 'scroll', 'data-scroll': 'drawer' }, status, info, respSec, mover, commentSec, hist, del)));
+    }
+
+    // ----- semanas -----
+    function weeksView() {
+      const weeks = allWeeks();
+      if (S.week == null || !weeks.includes(S.week)) S.week = weeks[0];
+      const cur = weekStart(S.now);
+      const list = h('nav', { class: 'wlist', 'aria-label': 'Semanas', 'data-scroll': 'wlist' }, weeks.map(s => {
+        const r = report(s), closed = S.semanas[weekKey(s)];
+        const pill = closed ? h('span', { class: 'pill sent' }, 'Enviado')
+          : s === cur ? (dueNow() ? h('span', { class: 'pill late' }, 'Enviar hoje') : h('span', { class: 'pill open' }, 'Em andamento'))
+          : h('span', { class: 'pill late' }, 'Não enviado');
+        return h('button', { class: 'wbtn', type: 'button', 'aria-current': String(s === S.week), onclick: () => { S.week = s; render(); } },
+          h('b', null, semana(s)),
+          h('span', { class: 'r' }, `${r.prontos.length} prontos · ${r.pendentes.length} pendentes`), pill);
+      }));
+      return h('div', { class: 'weeks' }, list, reportView(S.week));
+    }
+
+    function reportView(s) {
+      const r = report(s), closed = S.semanas[weekKey(s)];
+      const openIt = i => () => { S.openItem = i.id; S.confirm = null; S.resp = { perfil: '', senha: '', erro: '' }; render(); };
+      const sub = i => [i.detalhe, colName(i.coluna), i.responsavel ? 'responsável: ' + who(i.responsavel) : 'sem responsável'].filter(Boolean).join(' · ');
+      const prontoLi = i => h('li', { onclick: openIt(i) },
+        h('span', { class: 'line' }, h('span', { class: 'rn' }, i.titulo), ' - ', h('span', { class: 'ok' }, `tarefa durou ${dur(i.cumpridoEm - i.criadoEm)}`)),
+        h('span', { class: 'sub' }, `${sub(i)} · adicionada dia ${dataCompleta(i.criadoEm)} ${hora(i.criadoEm)}` +
+          (weekStart(i.criadoEm) !== s ? ` (semana ${weekLabel(weekStart(i.criadoEm))})` : '') +
+          ` · pronta dia ${dataCompleta(i.cumpridoEm)} ${hora(i.cumpridoEm)} por ${who(i.cumpridoPor)}`));
+      const pendLi = i => {
+        const depois = i.cumprido && i.cumpridoEm >= r.e;
+        return h('li', { onclick: openIt(i) },
+          h('span', { class: 'line' }, h('span', { class: 'rn' }, i.titulo), ' - ', h('span', { class: 'pend' }, `tarefa pendente há ${dur(r.ref - i.criadoEm)}`),
+            ` (adicionada dia ${dataCompleta(i.criadoEm)})`),
+          h('span', { class: 'sub' }, sub(i) + (weekStart(i.criadoEm) !== s ? ` · vem da semana ${weekLabel(weekStart(i.criadoEm))}` : '') +
+            (depois ? ` · ficou pronta depois, dia ${dataCompleta(i.cumpridoEm)} (semana ${weekLabel(weekStart(i.cumpridoEm))})` : '')));
+      };
+      return h('article', { class: 'report', 'data-scroll': 'report' },
+        h('div', { class: 'report-head' },
+          h('div', null, h('h2', null, `Relatório da ${semana(s)}`), r.isCur ? h('div', { class: 'sub' }, 'Semana atual') : null,
+            closed ? h('div', { class: 'closed-note' }, `Enviado ${dataCompleta(closed.fechadoEm)} ${hora(closed.fechadoEm)} por ${who(closed.fechadoPor)}`) : null),
+          h('div', { class: 'actions' },
+            h('button', { class: 'btn', type: 'button', onclick: () => copyReport(s) }, 'Copiar mensagem'),
+            !closed && !S.readOnly ? h('button', { class: 'btn primary', type: 'button', onclick: () => closeWeek(s) }, 'Marcar como enviado') : null)),
+        h('section', { class: 'rsec' }, h('h3', null, 'Esboço da mensagem'),
+          h('div', { class: 'esboco-box' },
+            h('textarea', { class: 'esboco', id: 'esboco-' + weekKey(s), 'data-key': 'esboco-' + weekKey(s), 'aria-label': 'Esboço da mensagem', spellcheck: 'true',
+              rows: String(Math.min(30, esboco(s).split('\n').length + 1)), value: esboco(s),
+              oninput: e => { S.rascunho[weekKey(s)] = e.target.value; } }),
+            h('div', { class: 'actions' },
+              h('span', { class: 'hint' }, S.rascunho[weekKey(s)] != null ? 'Você editou este esboço. Ele não se atualiza mais sozinho.' : 'Gerado automaticamente a partir do quadro. Pode editar antes de copiar.'),
+              S.rascunho[weekKey(s)] != null ? h('button', { class: 'btn', type: 'button', onclick: () => { delete S.rascunho[weekKey(s)]; render(); } }, 'Refazer esboço') : null,
+              h('button', { class: 'btn primary', type: 'button', onclick: () => copyReport(s) }, 'Copiar mensagem')))),
+        h('div', { class: 'nums' },
+          h('div', { class: 'num ok' }, h('b', null, r.prontos.length), h('span', null, 'prontos na semana')),
+          h('div', { class: 'num pend' }, h('b', null, r.pendentes.length), h('span', null, r.isCur ? 'pendentes agora' : 'pendentes no fim da semana')),
+          h('div', { class: 'num' }, h('b', null, r.adicionadas.length), h('span', null, 'adicionados na semana'))),
+        h('section', { class: 'rsec' }, h('h3', { class: 'ok' }, 'Prontos'),
+          r.prontos.length ? h('ul', { class: 'rlist' }, r.prontos.map(prontoLi)) : h('p', { class: 'empty-line' }, 'Nenhuma tarefa ficou pronta nesta semana.')),
+        h('section', { class: 'rsec' }, h('h3', { class: 'pend' }, 'Pendentes'),
+          r.pendentes.length ? h('ul', { class: 'rlist' }, r.pendentes.map(pendLi)) : h('p', { class: 'empty-line' }, 'Nada pendente.')));
+    }
+  }
+
+  // ---------- armazenamento ----------
+  // Sem Firebase configurado, os dados ficam só neste navegador (modo local).
+  function localStore() {
+    const KEY = 'quadro-tarefas-dados';
+    let data = {};
+    try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { data = {}; }
+    const listeners = [];
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} };
+    const coll = name => data[name] || (data[name] = {});
+    const emit = () => listeners.slice().forEach(l => l());
+    window.addEventListener('storage', e => { if (e.key === KEY) { try { data = JSON.parse(e.newValue) || {}; } catch {} emit(); } });
+    const clone = v => JSON.parse(JSON.stringify(v));
+    const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    function collection(name, field) {
+      return {
+        orderBy: f => collection(name, f),
+        onSnapshot(cb) {
+          const l = () => {
+            const docs = Object.entries(coll(name)).map(([id, v]) => ({ id, data: () => v }));
+            if (field) docs.sort((a, b) => (a.data()[field] ?? 0) - (b.data()[field] ?? 0));
+            cb({ docs, metadata: { fromCache: false } });
+          };
+          listeners.push(l); setTimeout(l, 0);
+          return () => { const i = listeners.indexOf(l); if (i >= 0) listeners.splice(i, 1); };
+        },
+        async add(v) { const id = rid(); coll(name)[id] = clone(v); save(); emit(); return { id }; },
+      };
+    }
+    function doc(path) {
+      const [name, id] = path.split('/');
+      return {
+        async get() { const v = coll(name)[id]; return { exists: !!v, data: () => v }; },
+        async set(v) { coll(name)[id] = clone(v); save(); emit(); },
+        async update(v) { if (!coll(name)[id]) throw { code: 'not-found' }; Object.assign(coll(name)[id], clone(v)); save(); emit(); },
+        async delete() { delete coll(name)[id]; save(); emit(); },
+      };
+    }
+    return { collection, doc };
+  }
+
+  const COLUNAS_PADRAO = ['Acordos', 'Balcões', 'Análise', 'Despachos (PJe)', 'Despachos (eproc)', 'Petições iniciais', 'Réplicas', 'Contestações', 'Averiguar processo'];
+  async function criarColunasPadrao(db) {
+    try {
+      const flag = await db.doc('config/quadro').get();
+      if (flag.exists) return;
+      await db.doc('config/quadro').set({ iniciadoEm: Date.now() });
+      for (let i = 0; i < COLUNAS_PADRAO.length; i++) await db.doc('colunas/padrao-' + (i + 1)).set({ nome: COLUNAS_PADRAO[i], ordem: i + 1 });
+    } catch (e) { console.warn(e); }
+  }
+
+  // ---------- perfis e login ----------
+  // O master cria os perfis e é o único que vê e troca as senhas.
+  const SESSAO_KEY = 'quadro-tarefas-sessao';
+  const lerSessao = () => { try { return JSON.parse(localStorage.getItem(SESSAO_KEY)) || null; } catch { return null; } };
+  const gravarSessao = v => { try { v ? localStorage.setItem(SESSAO_KEY, JSON.stringify(v)) : localStorage.removeItem(SESSAO_KEY); } catch {} };
+  function isMaster() { const p = S.perfis[S.meId]; return !!(p && p.master && p.ativo !== false); }
+  const perfisAtivos = () => Object.entries(S.perfis).filter(([, p]) => p.ativo !== false)
+    .map(([id, p]) => ({ id, ...p })).sort((a, b) => (b.master ? 1 : 0) - (a.master ? 1 : 0) || a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  const L = { perfil: '', senha: '', erro: '', nome: '', senha2: '' };
+  function telaEntrada(titulo, ...conteudo) {
+    fillEl(document.getElementById('me'), S.local ? h('span', { class: 'ro' }, 'Modo local') : null);
+    fillEl(document.getElementById('tabs'));
+    fillEl(document.getElementById('stats'));
+    document.getElementById('alert').replaceChildren();
+    document.getElementById('drawer').replaceChildren();
+    const card = h('form', { class: 'login', onsubmit: e => e.preventDefault() },
+      h('h2', null, titulo), conteudo, L.erro ? h('p', { class: 'erro', role: 'alert' }, L.erro) : null);
+    document.getElementById('wrap').replaceChildren(card);
+    const f = card.querySelector('[data-autofocus]'); if (f) f.focus();
+  }
+
+  function telaCriarMaster() {
+    const criar = async () => {
+      const nome = L.nome.trim();
+      if (!nome) { L.erro = 'Digite o nome do perfil master.'; return telaCriarMaster(); }
+      if (L.senha.length < 4) { L.erro = 'A senha precisa ter pelo menos 4 caracteres.'; return telaCriarMaster(); }
+      if (L.senha !== L.senha2) { L.erro = 'As duas senhas não são iguais.'; return telaCriarMaster(); }
+      const senha = L.senha;
+      const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      gravarSessao({ id, senha }); Object.assign(L, { senha: '', senha2: '', erro: '' });
+      try { await S.db.doc('perfis/' + id).set({ nome, senha, master: true, ativo: true, criadoEm: Date.now() }); }
+      catch (e) { console.error(e); gravarSessao(null); L.erro = 'Não foi possível criar o perfil. Verifique a conexão e as regras do Firestore.'; telaCriarMaster(); }
+    };
+    telaEntrada('Criar o perfil master',
+      h('p', { class: 'hint' }, 'É o primeiro acesso a este quadro. O perfil master cria os perfis da equipe e é o único que vê e troca as senhas.'),
+      h('label', { class: 'lbl' }, 'Nome', h('input', { class: 'field', id: 'm-nome', 'data-autofocus': true, value: L.nome, autocomplete: 'name', oninput: e => { L.nome = e.target.value; } })),
+      h('label', { class: 'lbl' }, 'Senha', h('input', { class: 'field', id: 'm-senha', type: 'password', value: L.senha, autocomplete: 'new-password', oninput: e => { L.senha = e.target.value; } })),
+      h('label', { class: 'lbl' }, 'Repita a senha', h('input', { class: 'field', id: 'm-senha2', type: 'password', value: L.senha2, autocomplete: 'new-password',
+        oninput: e => { L.senha2 = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') criar(); } })),
+      h('button', { class: 'btn primary', type: 'button', onclick: criar }, 'Criar perfil master'));
+  }
+
+  function telaLogin() {
+    const lista = perfisAtivos();
+    if (!lista.some(p => p.id === L.perfil)) L.perfil = '';
+    const entrar = () => {
+      const p = S.perfis[L.perfil];
+      if (!p) { L.erro = 'Escolha o seu perfil.'; return telaLogin(); }
+      if (p.senha !== L.senha) { L.erro = 'Senha incorreta. Se esqueceu, peça ao master para ver ou trocar sua senha.'; L.senha = ''; return telaLogin(); }
+      gravarSessao({ id: L.perfil, senha: L.senha }); S.meId = L.perfil;
+      Object.assign(L, { senha: '', erro: '' });
+      rota();
+    };
+    telaEntrada('Entrar no quadro',
+      h('label', { class: 'lbl' }, 'Perfil',
+        h('select', { id: 'l-perfil', 'data-autofocus': !L.perfil, onchange: e => { L.perfil = e.target.value; } },
+          h('option', { value: '', selected: !L.perfil }, 'Escolha o seu nome'),
+          lista.map(p => h('option', { value: p.id, selected: p.id === L.perfil }, p.nome + (p.master ? ' (master)' : ''))))),
+      h('label', { class: 'lbl' }, 'Senha', h('input', { class: 'field', id: 'l-senha', type: 'password', 'data-autofocus': !!L.perfil, value: L.senha, autocomplete: 'current-password',
+        oninput: e => { L.senha = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') entrar(); } })),
+      h('button', { class: 'btn primary', type: 'button', onclick: entrar }, 'Entrar'));
+  }
+
+  // Decide o que mostrar sempre que os perfis mudam.
+  let naTelaDeEntrada = '';
+  function rota() {
+    if (!S.perfisLoaded) return;
+    const ativos = perfisAtivos();
+    if (!ativos.length) { S.meId = null; gravarSessao(null); if (naTelaDeEntrada !== 'master') { naTelaDeEntrada = 'master'; telaCriarMaster(); } return; }
+    const sess = lerSessao();
+    const p = sess && S.perfis[sess.id];
+    if (!p || p.ativo === false || p.senha !== sess.senha) {
+      if (S.meId) L.erro = p && p.ativo !== false ? 'Sua senha foi alterada pelo master. Entre de novo.' : 'Seu perfil foi desativado pelo master.';
+      S.meId = null; gravarSessao(null);
+      naTelaDeEntrada = 'login'; telaLogin(); return;
+    }
+    S.meId = sess.id; naTelaDeEntrada = '';
+    boot();
+  }
+  S.sair = () => { gravarSessao(null); S.meId = null; S.openItem = null; S.tab = 'quadro'; L.perfil = ''; L.erro = ''; naTelaDeEntrada = 'login'; telaLogin(); };
+
+  // ----- tela de perfis (só master) -----
+  async function criarPerfil() {
+    const nome = S.novo.nome.trim(), senha = S.novo.senha;
+    if (!nome) return toast('Digite o nome do novo perfil.');
+    if (senha.length < 4) return toast('A senha precisa ter pelo menos 4 caracteres.');
+    if (perfisAtivos().some(p => p.nome.toLowerCase() === nome.toLowerCase())) return toast('Já existe um perfil com esse nome.');
+    S.novo = { nome: '', senha: '' }; render();
+    if (await write(() => S.db.collection('perfis').add({ nome, senha, master: false, ativo: true, criadoEm: Date.now(), criadoPor: S.meId })))
+      toast(`Perfil de ${nome} criado.`);
+  }
+  async function salvarPerfil() {
+    const e = S.editPerfil; if (!e) return;
+    const v = e.valor.trim();
+    if (e.campo === 'senha' && e.valor.length < 4) return toast('A senha precisa ter pelo menos 4 caracteres.');
+    if (e.campo === 'nome' && !v) return toast('Digite o nome.');
+    S.editPerfil = null; render();
+    const dados = e.campo === 'senha' ? { senha: e.valor } : { nome: v };
+    if (e.id === S.meId && e.campo === 'senha') gravarSessao({ id: S.meId, senha: e.valor });
+    if (await write(() => S.db.doc('perfis/' + e.id).update(dados))) toast(e.campo === 'senha' ? 'Senha trocada.' : 'Nome alterado.');
+  }
+
+  function perfisView() {
+    const lista = Object.entries(S.perfis).map(([id, p]) => ({ id, ...p }))
+      .sort((a, b) => (a.ativo === false) - (b.ativo === false) || (b.master ? 1 : 0) - (a.master ? 1 : 0) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const btnCriar = h('button', { class: 'btn primary', type: 'button', onclick: criarPerfil }, 'Criar perfil');
+    const rows = lista.map(p => {
+      const ed = S.editPerfil && S.editPerfil.id === p.id ? S.editPerfil : null;
+      const inativo = p.ativo === false;
+      const campoEdit = campo => h('div', { class: 'actions', style: 'flex-wrap:nowrap' },
+        h('input', { class: 'field', 'data-key': 'pe-' + p.id, 'data-autofocus': true, type: 'text', value: ed.valor, style: 'min-width:120px',
+          'aria-label': campo === 'senha' ? 'Nova senha' : 'Novo nome',
+          oninput: e => { ed.valor = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') salvarPerfil(); if (e.key === 'Escape') { S.editPerfil = null; render(); } } }),
+        h('button', { class: 'btn primary', type: 'button', onclick: salvarPerfil }, 'Salvar'),
+        h('button', { class: 'btn', type: 'button', onclick: () => { S.editPerfil = null; render(); } }, 'Cancelar'));
+      const confirmando = S.confirm && S.confirm.kind === 'perfil' && S.confirm.id === p.id;
+      return h('tr', { style: inativo ? 'opacity:.55' : null },
+        h('td', null, ed && ed.campo === 'nome' ? campoEdit('nome') : h('span', { class: 't' }, p.nome)),
+        h('td', null, ed && ed.campo === 'senha' ? campoEdit('senha') : h('div', { class: 'actions', style: 'flex-wrap:nowrap' },
+          h('span', { class: 'mono senha' }, S.verSenha[p.id] ? p.senha : '••••••'),
+          h('button', { class: 'btn', type: 'button', style: 'padding:2px 8px', onclick: () => { S.verSenha[p.id] = !S.verSenha[p.id]; render(); } }, S.verSenha[p.id] ? 'Ocultar' : 'Mostrar'))),
+        h('td', null, p.master ? h('span', { class: 'pill sent' }, 'Master') : 'Colaborador', inativo ? h('div', { class: 'd' }, 'Desativado') : null),
+        h('td', null, confirmando
+          ? h('div', { class: 'confirm' }, h('span', null, `Desativar ${p.nome}? A pessoa não consegue mais entrar, mas o nome continua no histórico e nos relatórios.`),
+              h('div', { class: 'actions' },
+                h('button', { class: 'btn danger', type: 'button', onclick: async () => { S.confirm = null; await write(() => S.db.doc('perfis/' + p.id).update({ ativo: false })); } }, 'Desativar'),
+                h('button', { class: 'btn', type: 'button', onclick: () => { S.confirm = null; render(); } }, 'Cancelar')))
+          : h('div', { class: 'actions' },
+              inativo ? h('button', { class: 'btn', type: 'button', onclick: () => write(() => S.db.doc('perfis/' + p.id).update({ ativo: true })) }, 'Reativar') : [
+                h('button', { class: 'btn', type: 'button', onclick: () => { S.editPerfil = { id: p.id, campo: 'senha', valor: '' }; render(); } }, 'Trocar senha'),
+                h('button', { class: 'btn', type: 'button', onclick: () => { S.editPerfil = { id: p.id, campo: 'nome', valor: p.nome }; render(); } }, 'Renomear'),
+                p.id === S.meId ? null : h('button', { class: 'btn', type: 'button', style: 'color:var(--red)', onclick: () => { S.confirm = { kind: 'perfil', id: p.id }; render(); } }, 'Desativar'),
+              ])));
+    });
+    return h('article', { class: 'report', 'data-scroll': 'perfis' },
+      h('div', { class: 'report-head' }, h('div', null, h('h2', null, 'Perfis da equipe'),
+        h('div', { class: 'sub' }, 'Só você, como master, vê esta tela. Cada pessoa entra com o próprio perfil e senha e não consegue trocar a senha sozinha.'))),
+      h('section', { class: 'rsec' }, h('h3', null, 'Novo perfil'),
+        h('div', { class: 'novo-perfil' },
+          h('label', { class: 'lbl' }, 'Nome', h('input', { class: 'field', 'data-key': 'np-nome', value: S.novo.nome, placeholder: 'Ex.: Luiza',
+            oninput: e => { S.novo.nome = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') criarPerfil(); } })),
+          h('label', { class: 'lbl' }, 'Senha', h('input', { class: 'field', 'data-key': 'np-senha', type: 'text', value: S.novo.senha, placeholder: 'Mínimo 4 caracteres', autocomplete: 'off',
+            oninput: e => { S.novo.senha = e.target.value; }, onkeydown: e => { if (e.key === 'Enter') criarPerfil(); } })),
+          btnCriar)),
+      h('section', { class: 'rsec' }, h('h3', null, `Perfis (${lista.filter(p => p.ativo !== false).length} ativos)`),
+        h('div', { class: 'tbl-wrap' }, h('table', null,
+          h('thead', null, h('tr', null, h('th', null, 'Nome'), h('th', null, 'Senha'), h('th', null, 'Função'), h('th', null, 'Ações'))),
+          h('tbody', null, rows)))));
+  }
+
+  // ---------- início ----------
+  let iniciado = false;
+  async function start() {
+    const cfg = window.FIREBASE_CONFIG;
+    let db;
+    if (cfg && cfg.apiKey && window.firebase) {
+      try { firebase.initializeApp(cfg); db = firebase.firestore(); }
+      catch (e) { console.error(e); toast('Não foi possível conectar ao Firebase. Confira a configuração no início do arquivo.'); }
+    }
+    S.local = !db;
+    S.db = db || localStore();
+    if (S.local) {
+      document.getElementById('modo').replaceChildren(h('div', { class: 'alert', style: 'background:var(--marker-soft);border-color:var(--marker)' },
+        h('p', null, h('strong', { style: 'color:var(--marker)' }, 'Modo local. '),
+          'Os dados ficam só neste navegador. Para a equipe toda usar o mesmo quadro, configure o Firebase no início do arquivo index.html.')));
+    }
+    S.db.collection('perfis').onSnapshot(s => {
+      S.perfis = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
+      if (s.metadata && s.metadata.fromCache && !s.docs.length) return; // espera a resposta do servidor antes de pedir o master
+      S.perfisLoaded = true;
+      rota();
+    }, e => { console.error(e); toast('Não foi possível carregar os perfis. Confira a conexão e as regras do Firestore.'); });
+  }
+
+  function boot() {
+    if (iniciado) { render(); return; }
+    iniciado = true;
+    const db = S.db;
+    const onErr = e => {
+      console.error(e);
+      toast(e && e.code === 'permission-denied'
+        ? 'O banco de dados recusou o acesso. Confira as regras do Firestore.'
+        : 'A conexão com o quadro caiu. Recarregue a página.');
+    };
+    criarColunasPadrao(db);
+    db.collection('colunas').orderBy('ordem').onSnapshot(s => { S.cols = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.cols = true; render(); }, onErr);
+    db.collection('itens').onSnapshot(s => { S.itens = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.itens = true; render(); }, onErr);
+    db.collection('semanas').onSnapshot(s => { S.semanas = Object.fromEntries(s.docs.map(d => [d.id, d.data()])); S.loaded.semanas = true; render(); }, onErr);
+    render();
+    // checa o horário a cada 30 s para o aviso de sexta 16:30
+    let lastKey = '';
+    setInterval(() => {
+      S.now = Date.now();
+      const key = dueNow() + '|' + weekStart(S.now);
+      if (key !== lastKey && S.meId) { lastKey = key; render(); }
+    }, 30000);
+  }
+  start();
+})();
+</script>
+</body>
+</html>
